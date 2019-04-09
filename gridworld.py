@@ -90,6 +90,9 @@ class GridworldEnv(discrete.DiscreteEnv):
         # This should not be used in any model-free learning algorithm
         self.P = P
         
+        # Save terminal states
+        self.terminalStates = (0, nS-1)
+        
         super(GridworldEnv, self).__init__(nS, nA, P, isd)
 
     def _render(self, mode='human', close=False):

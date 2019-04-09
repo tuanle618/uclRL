@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Mar 27 16:10:13 2019
-
-@author: Tuan
-
+@author: Tuan Le
+@email: tuanle@hotmail.de
 """
 
 from gridworld import GridworldEnv
