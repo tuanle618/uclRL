@@ -46,8 +46,8 @@ class Agent:
         while True:
             if done:
                 return episode
-            # select a random action
-            action = np.random.choice(self.nA)
+            # select a random action given the current state [note this is uniformly distributed]
+            action = np.random.choice(self.nA, p=self.env.isap[state])
             # from the current state get transition probability information from environment
             [(prob, next_state, reward, done)] = self.env.P[state][action]
             # append episode with step-dictionary
