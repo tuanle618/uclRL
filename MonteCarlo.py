@@ -35,7 +35,7 @@ class Agent:
         self.epsilon = epsilon
         self.vFnc= np.zeros(self.nS)
         
-    def generate_episode(self):
+    def generate_episode(self, policy):
         # Initialize random first non-terminal state
         state = np.random.choice(a=np.arange(start=1, stop=self.env.terminalStates[1]-1, step=1))
         # Initialize episode list of sequences: S_i,A_i,R_i+1
@@ -47,7 +47,7 @@ class Agent:
             if done:
                 return episode
             # select a random action given the current state [note this is uniformly distributed]
-            action = np.random.choice(self.nA, p=self.env.isap[state])
+            action = np.random.choice(self.nA, p=policy[state])
             # from the current state get transition probability information from environment
             [(prob, next_state, reward, done)] = self.env.P[state][action]
             # append episode with step-dictionary
@@ -56,10 +56,14 @@ class Agent:
             state = next_state
             
             
-    def monte_carlo(self, num_iter=10000, discount_factor=None, first_visit=True):
+    def monte_carlo(self, policy=None, num_iter=10000, discount_factor=None, first_visit=True):
         """
         
         """
+        if policy is None:
+            ### Uniformly distributed action matrix given states. Shape: nS x nA 
+            policy = self.env.isap
+            
         ## Initialize a state value function V arbitrarily
         v_fnc = np.zeros(self.nS)
         ## Initialize return lists for each state as dictionary
@@ -72,7 +76,7 @@ class Agent:
             ## Initialize return G (total discounted reward) to be 0
             G = 0
             ## Initialize an episode
-            episode = self.generate_episode()
+            episode = self.generate_episode(policy)
             ## Reverse episode to begin with last time step
             reversed_episode = episode[::-1]
             for t, step in enumerate(reversed_episode):
@@ -99,7 +103,7 @@ def main():
     env = GridworldEnv(shape=[4,4])
     agent = Agent(env)
     ## Sample one episode
-    episode = agent.generate_episode()
+    episode = agent.generate_episode(policy=agent.env.isap)
     print("Example: Sample episode for Monte Carlo:")
     print(episode)
     ## Do First-Visit-Monte-Carlo
