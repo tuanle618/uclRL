@@ -34,11 +34,18 @@ class Agent:
         self.env = env
         self.epsilon = epsilon
         self.vFnc= np.zeros(self.nS)
-        
+    
+    def init_state(self):
+        ## Initializes a random state but not terminal state
+        non_terminal_states = np.arange(self.nS)
+        non_terminal_states = [state for state in non_terminal_states if state not in self.env.terminalStates]
+        init_state = int(np.random.choice(a=non_terminal_states, size=1))
+        return init_state
+    
     def generate_episode(self, policy, state=None):
         # Initialize random first non-terminal state if not inserted
         if state is None:
-            state = np.random.choice(a=np.arange(start=1, stop=self.env.terminalStates[1]-1, step=1))
+            state = self.init_state()
         # Initialize episode list of sequences: S_i,A_i,R_i+1
         episode = []
         # Initialize done variable to be false
@@ -143,7 +150,7 @@ class Agent:
         for _ in range(num_iter):
             ## Generate an episode:
             # First sample a init state
-            state = np.random.choice(a=np.arange(start=1, stop=self.env.terminalStates[1]-1, step=1))
+            state = self.init_state()
             if epsilon_method:
                 control_policy = self.epsilon_greedy_action_policy(Q, state)
             else: # take uniformly distributed policy. "With exploring starts Algorithm"

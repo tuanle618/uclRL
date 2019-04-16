@@ -6,6 +6,7 @@
 """
 
 from gridworld import GridworldEnv
+from windy_gridworld import WindyGridworldEnv
 import numpy as np
 
 class Agent:    
@@ -37,7 +38,9 @@ class Agent:
         
     def init_state(self):
         ## Initializes a random state but not terminal state
-        init_state = np.random.choice(a=np.arange(start=1, stop=self.env.terminalStates[1]-1, step=1))
+        non_terminal_states = np.arange(self.nS)
+        non_terminal_states = [state for state in non_terminal_states if state not in self.env.terminalStates]
+        init_state = int(np.random.choice(a=non_terminal_states, size=1))
         return init_state
         
     def get_action(self, state, policy):
@@ -175,7 +178,70 @@ class Agent:
                 
             
         return v_fnc
+   
+
+    def epsilon_greedy_action_policy(self, Q, state, epsilon=0.1):
+        """
+        Epsilon greedy exploration:
+            - All self.nA actions are tried with non-zero probability.
+            - With probability 1-epsilon choose the greedy action
+            - With probability epsilon choose an action at random
+            functional: policy(a|s) = epsilon/nA  + 1 - epsilon, iif. a is argmax of Q(s,a)
+                        else: epsilon/nA otherwise
+        Returns:
+            A numpy vector for action probability to sample given a state
+        """
+        
+        A = np.ones(self.nA, dtype=float) * epsilon / self.nA
+        best_action = np.argmax(Q[state])
+        A[best_action] += (1.0 - epsilon)
+    
+        return A
+    
+    def sarsa(self, num_iter=1000, alpha=0.25, discount_factor=None, epsilon=0.1):
+        """
+        Algorithm for TD Control can be seen at: http://incompleteideas.net/book/ebook/node64.html
+        
+        The first version does not include the Lambda Version as done for TD(Lambda)
+        """
+        
+        if discount_factor is None:
+            discount_factor = self.discount_factor
+            
+        ##Initialize the state-action Q Function arbitrarily to be 0
+        Q = np.zeros(shape=(self.nS, self.nA))
+        ##Loop forever for each episode / trajectory
+        for _ in range(num_iter):
+            ## Initialize S:
+            state = int(self.init_state())
+            ## Choose action A from S using policy derived from Q (e.g epsilon-greedy)
+            action_probs = self.epsilon_greedy_action_policy(Q, state, epsilon)
+            ## Sample an action from the given probabilities
+            action = int(np.random.choice(a=self.nA, size=1, p=action_probs))
+            ## Repeat for each step of episode until terminal state:
+            #print("state", state)
+            #print("action", action)
+            while True:
+                ## Take action A, observe, R, S'
+                [(prob, next_state, reward, done)] = self.env.P[state][action]
+
+                ## Choose A' from S' using policy derived from Q (e.g epsilon greedy)
+                action_probs = self.epsilon_greedy_action_policy(Q, next_state, epsilon)
+                ## Sampled epsilon greedy action
+                epsilon_action = int(np.random.choice(a=self.nA, size=1, p=action_probs))
+                ## Update state-action Q function Q(S,A)
+                td_target = reward + discount_factor*Q[next_state, epsilon_action]
+                td_error = td_target - Q[state, action]
+                Q[state, action] += alpha*td_error
                 
+                if done:
+                    break
+                
+                state = int(next_state)
+                action = epsilon_action
+                
+        return Q
+    
 def main():
     np.random.seed(26)
     env = GridworldEnv(shape=[4,4])
@@ -192,6 +258,16 @@ def main():
     print("Result forward TD(Lambda=0.5) Value function:")
     print(td_lambda_res_fw.reshape((env.shape)))
     
+    sarsa_gridworld = agent.sarsa(num_iter=1000, alpha=0.25, discount_factor=None, epsilon=0.1)
+    print("Result SARSA (no Lambda) for gridworld. Optimal Q function:")
+    print(np.round(sarsa_gridworld, 2))    
+    
+    windy_env = WindyGridworldEnv()
+    agent_2 = Agent(windy_env)
+    sarsa_windy_gridworld = agent_2.sarsa(num_iter=1000, alpha=0.25, discount_factor=None, epsilon=0.1)
+    print("Result SARSA (no Lambda) for windy gridworld. Optimal Q function:")
+    print(np.round(sarsa_windy_gridworld, 2))    
+
 if __name__ == "__main__":
     main()
     

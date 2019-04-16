@@ -57,6 +57,9 @@ class WindyGridworldEnv(discrete.DiscreteEnv):
         # We always start in state (3, 0)
         isd = np.zeros(nS)
         isd[np.ravel_multi_index((3,0), self.shape)] = 1.0
+        
+         # Save terminal states
+        self.terminalStates = [34]
 
         super(WindyGridworldEnv, self).__init__(nS, nA, P, isd)
 

@@ -91,7 +91,7 @@ class GridworldEnv(discrete.DiscreteEnv):
         self.P = P
         
         # Save terminal states
-        self.terminalStates = (0, nS-1)
+        self.terminalStates = [0, nS-1]
         
         super(GridworldEnv, self).__init__(nS, nA, P, isd)
 
