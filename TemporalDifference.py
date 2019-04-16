@@ -242,6 +242,52 @@ class Agent:
                 
         return Q
     
+    def sarsa_lambda(self, num_iter=1000, alpha=0.25, lambda_=0.5, discount_factor=None, epsilon=0.1):
+        """
+        Algorithm taken from David Silvers Course, Lecture 5 - On-Policy TD Learning - Sarsa(Lambda)
+        """
+        
+        if discount_factor is None:
+            discount_factor = self.discount_factor
+            
+        ## Initialize Q function
+        Q = np.zeros(shape=(self.nS, self.nA))
+        ## Loop forever
+        for _ in range(num_iter):
+            ## Initialize eligibility trace (matrix) for state-action space
+            E = np.zeros(shape=(self.nS, self.nA))
+            ## Initialize state and action
+            state = int(self.init_state())
+            action = int(np.random.choice(self.nA, size=1))
+            ## Repeat for each step of episode
+            while True:
+                ## Take action A, observe reward R and next state S'
+                [(prob, next_state, reward, done)] = self.env.P[state][action]
+                ## Choose next action A' from next state S' using policy derived from Q (e.g epislon greedy)
+                action_probs = self.epsilon_greedy_action_policy(Q, next_state, epsilon)
+                epsilon_action = int(np.random.choice(self.nA, size=1, p=action_probs))
+                ## Compute td error (delta)
+                td_error = reward + discount_factor*Q[next_state, epsilon_action] - Q[state, action]
+                ##  Increment Frequency part in E-trace
+                E[state, action] += 1
+                ## Loop through each state and action
+                for s in range(self.nS):
+                    for a in range(self.nA):
+                        ## Update Q function
+                        Q[s, a] += alpha*td_error*E[s, a]
+                        ## Update E-trace in terms of recency
+                        E[s, a] *= discount_factor*lambda_
+                if done:
+                    break
+                
+                state = int(next_state)
+                action = int(epsilon_action)
+        
+        return Q
+                        
+            
+    
+    
 def main():
     np.random.seed(26)
     env = GridworldEnv(shape=[4,4])
@@ -260,7 +306,12 @@ def main():
     
     sarsa_gridworld = agent.sarsa(num_iter=1000, alpha=0.25, discount_factor=None, epsilon=0.1)
     print("Result SARSA (no Lambda) for gridworld. Optimal Q function:")
-    print(np.round(sarsa_gridworld, 2))    
+    print(np.round(sarsa_gridworld, 2))        
+    
+    sarsa_gridworld_lambda = agent.sarsa_lambda(num_iter=1000, alpha=0.25, lambda_=0.5,
+                                                discount_factor=None, epsilon=0.1)
+    print("Result SARSA (lambda=0.5) for gridworld. Optimal Q function:")
+    print(np.round(sarsa_gridworld_lambda, 2))   
     
     windy_env = WindyGridworldEnv()
     agent_2 = Agent(windy_env)
@@ -268,6 +319,12 @@ def main():
     print("Result SARSA (no Lambda) for windy gridworld. Optimal Q function:")
     print(np.round(sarsa_windy_gridworld, 2))    
 
+    sarsa_windy_gridworld_lambda = agent_2.sarsa_lambda(num_iter=1000, alpha=0.25, discount_factor=None,
+                                                        epsilon=0.1, lambda_=0.5)
+    print("Result SARSA (lambda=0.5) for windy gridworld. Optimal Q function:")
+    print(np.round(sarsa_windy_gridworld_lambda, 2))    
+    
+    
 if __name__ == "__main__":
     main()
     
