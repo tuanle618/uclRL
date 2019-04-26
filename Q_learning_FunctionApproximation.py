@@ -170,7 +170,7 @@ def make_epsilon_greedy_policy(estimator, epsilon, nA):
 
 def q_learning(env, estimator, num_episodes=1000, discount_factor=1.0, epsilon=0.1, epsilon_decay=1.0):
     """
-    Q-Learning algorithm for fff-policy TD control using Function Approximation.
+    Q-Learning algorithm for off-policy TD control using Function Approximation.
     Finds the optimal greedy policy while following an epsilon-greedy policy.
     
     Args:

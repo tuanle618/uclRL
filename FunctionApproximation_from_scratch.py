@@ -77,18 +77,23 @@ class Estimator():
     """
     
     """
-    def __init__(self, n_features, featurizer, scaler, lr=0.05):
+    def __init__(self, nA,  n_features, featurizer, scaler, lr=0.05):
         ## for each action create a model
-        self.W = [np.random.randn(n_features) for _ in range(env.action_space.n)]
-        
+        self.W = [np.random.randn(n_features) for _ in range(nA)]
         self.featurizer = featurizer
         self.scaler = scaler
         self.lr = lr
     
     def featurize_state(self, state):
+        """
+        Inputs: state-vector
+        """
         scaled = self.scaler.transform([state])
+        ## out shape: (1, nS)
         features = self.featurizer.transform(scaled)
+        ## out shape: (1, n_features)
         return features[0]
+        ## oout shaoe: (n_features, )
 
     
     def predict(self, s, a=None):
@@ -100,13 +105,13 @@ class Estimator():
             a: (Optional) action to make a prediction for
             
         Returns
-            If an action a is given this returns a single number as the prediction.
-            If no action is given this returns a vector or predictions for all actions
+            If an action a is given this returns a single number as the prediction and features for gradient update.
+            If no action is given this returns a vector or predictions for all actions and features for gradient update.
             in the environment where pred[i] is the prediction for action i.
             
         """
         features = self.featurize_state(s)
-        if not a:
+        if a is None:
             prediction = []
             for w in self.W:
                 model_prediction = np.matmul(w, features)
@@ -132,13 +137,152 @@ class Estimator():
         """
         Performs a gradient update on one sample
         """
-        ## Compute the current prediction
-        v = self.predict(s, a)
+        ## Compute the current prediction (q_hat)
+        v = self.predict(s=s, a=a)
+        features = self.featurize_state(s)
         ## Note v_pred is the td-target for next iteration
-        grad = self.l2_gradient(v, v_pred)
+        grad = self.l2_gradient(v, v_pred, features)
         ## Perform update
         self.W[a] += self.lr*grad
         
         
-estimator = Estimator(n_features=400, featurizer=featurizer, scaler=scaler)
+class Agent():
+    """
+    
+    """
+    def __init__(self, env, discount_factor=1.0):
+        """
 
+        """
+        self.discount_factor = discount_factor
+        self.env = env
+        
+    def make_epsilon_greedy_policy(self, estimator, epsilon, nA):
+        """
+        Creates an epsilon-greedy policy based on a given Q-function approximator and epsilon.
+        
+        Args:
+            estimator: An estimator that returns q values for a given state
+            epsilon: The probability to select a random action . float between 0 and 1.
+            nA: Number of actions in the environment.
+        
+        Computation for epsilon greedy probabilites:
+            functional: policy(a|s) = epsilon/nA  + 1 - epsilon, iif. a is argmax of Q(s,a) [[greedy-exploitation]]
+            else: epsilon/nA otherwise [[exploration]]
+        Returns:
+            A function that takes the observation as an argument and returns
+            the probabilities for each action in the form of a numpy array of length nA.
+        
+        """
+        def policy_fn(observation):
+            """
+            Args:
+                observation: This is a state vector
+            """
+            A = np.ones(nA, dtype=float) * epsilon / nA
+            q_values = estimator.predict(observation)
+            best_action = np.argmax(q_values)
+            A[best_action] += (1.0 - epsilon)
+            return A
+        return policy_fn
+    
+    def q_learning(self, estimator, num_episodes=1000, epsilon=0.1, epsilon_decay=1.0):
+        """
+        Q-Learning algorithm for off-policy TD control using Function Approximation.
+        Finds the optimal greedy policy while following an epsilon-greedy policy.
+        
+        Args:
+            estimator: Action-Value function estimator
+            num_episodes: Number of episodes to run for.
+            discount_factor: Gamma discount factor.
+            epsilon: Chance the sample a random action. Float betwen 0 and 1.
+            epsilon_decay: Each episode, epsilon is decayed by this factor
+        
+        Returns:
+            An EpisodeStats object with two numpy arrays for episode_lengths and episode_rewards.
+        """
+        
+        ## Keeps track of useful statistics:
+        stats = {"episode_length": np.zeros(num_episodes),
+                 "episode_rewards": np.zeros(num_episodes)
+                }
+        
+        for i_episode in range(num_episodes):
+            
+            # The policy we're following
+            # For each iteration we include a decay in the epsilon parameter
+            policy = self.make_epsilon_greedy_policy(
+                estimator = estimator,
+                epsilon = epsilon * epsilon_decay**i_episode,
+                nA = self.env.action_space.n)
+            
+            # Print out which episode we're on, useful for debugging.
+            # Also print reward for last episode
+            last_reward = stats["episode_rewards"][i_episode - 1]
+            sys.stdout.flush()
+            
+            # Reset the environment and pick the first action
+            state = env.reset()
+            
+            # Only used for SARSA, not Q-Learning
+            next_action = None
+        
+            # One step in the environment## endless loop until break
+            for t in itertools.count():
+                            
+                # Choose an action to take
+                # If we're using SARSA we already decided in the previous step
+                if next_action is None:
+                    ## Get epsilon greedy draw probabilities for actions
+                    action_probs = policy(state)
+                    ## Draw one action with epsilon greedy probabilities
+                    action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
+                else:
+                    action = next_action
+                
+                # Take a step
+                next_state, reward, done, _ = env.step(action)
+        
+                # Update statistics
+                stats["episode_rewards"][i_episode] += reward
+                stats["episode_length"][i_episode] = t
+                
+                # TD Update#
+                out = estimator.predict(s=next_state, a=None)
+                q_values_next = out[0]
+                
+                # Use this code for Q-Learning
+                # Q-Value TD Target
+                td_target = reward + self.discount_factor * np.max(q_values_next)
+                
+                # Use this code for SARSA TD Target for on policy-training:
+                # next_action_probs = policy(next_state)
+                # next_action = np.random.choice(np.arange(len(next_action_probs)), p=next_action_probs)             
+                # td_target = reward + discount_factor * q_values_next[next_action]
+                
+                # Update the function approximator using our target
+                estimator.update(s=state, a=action, v_pred=td_target)
+                
+                print("\rStep {} @ Episode {}/{} ({})".format(t, i_episode + 1, num_episodes, last_reward), end="")
+                    
+                if done:
+                    break
+                    
+                state = next_state
+
+        return stats
+        
+    
+
+estimator = Estimator(n_features=400, nA=env.action_space.n, featurizer=featurizer, scaler=scaler)
+agent = Agent(env, discount_factor=1.0)
+
+def do_q():
+    import time
+    t = time.process_time()
+    stats = agent.q_learning(estimator=estimator, num_episodes=100, epsilon=0.1, epsilon_decay=1.0)
+    elapsed_time = time.process_time() - t
+    return stats, elapsed_time
+
+stats, elapsed_time = do_q()
+print("Elapsed time:",  elapsed_time)
